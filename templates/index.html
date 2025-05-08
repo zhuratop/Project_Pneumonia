@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CheckPneumonia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            color: #4a5568;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+        }
+
+        .upload-zone:hover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .upload-zone.dragover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+
+        .upload-zone p {
+            color: #4a5568;
+            margin-bottom: 1rem;
+        }
+
+        .upload-zone .icon {
+            font-size: 3rem;
+            color: #4299e1;
+            margin-bottom: 1rem;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border-radius: 8px;
+            display: none;
+            text-align: center;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .result.success {
+            background: #f0fff4;
+            color: #276749;
+            border: 1px solid #9ae6b4;
+        }
+
+        .result.danger {
+            background: #fff5f5;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+        }
+
+        .result .message {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result .probability {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 2rem;
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4299e1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CheckPneumonia</h1>
+            <p>Наш сервис позволяет бесплатно проверить на пневмонию по рентгеновскому снимку.<br>Загрузите фото</p>
+        </div>
+
+        <div class="upload-zone" id="drop-zone">
+            <div class="icon">📁</div>
+            <p>Перетащите файл сюда или кликните для выбора</p>
+            <p style="font-size: 0.9rem; color: #718096;">Поддерживаемые форматы: JPG, JPEG, PNG</p>
+            <input type="file" id="file-input" accept=".jpg,.jpeg,.png">
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Обработка изображения...</p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+
+        // Drag and drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (validateFile(file)) {
+                    uploadFile(file);
+                }
+            }
+        }
+
+        function validateFile(file) {
+            const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+            const maxSize = 16 * 1024 * 1024; // 16MB
+
+            if (!validTypes.includes(file.type)) {
+                showResult('Пожалуйста, загрузите файл в формате JPG, JPEG или PNG', false);
+                return false;
+            }
+
+            if (file.size > maxSize) {
+                showResult('Размер файла не должен превышать 16MB', false);
+                return false;
+            }
+
+            return true;
+        }
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                loading.style.display = 'none';
+                if (data.success) {
+                    showResult(data);
+                } else {
+                    showError(data.error || 'Произошла ошибка при обработке файла');
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                showError('Произошла ошибка при загрузке файла');
+            });
+        }
+
+        function showResult(data) {
+            const probability = parseFloat(data.prediction) * 100;
+            const isPneumonia = probability > 50;
+            
+            result.innerHTML = `
+                <div class="message">${isPneumonia ? 'Пневмония обнаружена' : 'Пневмония не обнаружена'}</div>
+                <div class="probability">(вероятность пневмонии: ${probability.toFixed(1)}%)</div>
+            `;
+            result.style.display = 'block';
+            result.className = 'result ' + (isPneumonia ? 'danger' : 'success');
+            
+            // Прокрутка к результату
+            result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function showError(message) {
+            result.innerHTML = `<div class="message">${message}</div>`;
+            result.style.display = 'block';
+            result.className = 'result error';
+        }
+    </script>
+</body>
+</html> 
