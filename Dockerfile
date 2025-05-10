@@ -31,4 +31,4 @@ RUN mkdir -p uploads
 EXPOSE 5000
 
 # Запускаем приложение
-CMD ["python3", "app.py"] 
+CMD ["python3", "app.py"]
