@@ -7,6 +7,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import load_img, img_to_array
 import numpy as np
 import logging
+import sys
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -17,10 +18,14 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
-model_path = 'C:/Users/Huawei/.cache/kagglehub/models/krishnagarigipati/pneumonia-detector/keras/v1/1/final_pneumonia_model.h5'
+# Путь к модели относительно текущей директории
+model_path = 'models/final_pneumonia_model.h5'
 
 # Создаем папку для загрузок, если её нет
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Создаем папку для модели, если её нет
+os.makedirs('models', exist_ok=True)
 
 # Инициализация базы данных
 def init_db():
@@ -36,11 +41,15 @@ def init_db():
 
 # Загрузка модели
 try:
+    if not os.path.exists(model_path):
+        logger.error(f"Модель не найдена по пути: {model_path}")
+        logger.error("Пожалуйста, запустите download_model.py для загрузки модели")
+        sys.exit(1)
     model = load_model(model_path)
     logger.info("Модель успешно загружена")
 except Exception as e:
     logger.error(f"Ошибка при загрузке модели: {str(e)}")
-    raise
+    sys.exit(1)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -117,4 +126,4 @@ def upload_file():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True) 
+    app.run(host='0.0.0.0', port=5000, debug=False) 

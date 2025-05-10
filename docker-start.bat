@@ -3,11 +3,15 @@ echo Stopping and removing existing container if exists...
 docker stop pneumonia-detector 2>nul
 docker rm pneumonia-detector 2>nul
 
+echo Creating necessary directories...
+if not exist uploads mkdir uploads
+if not exist models mkdir models
+
+echo Checking if model exists...
+python download_model.py
+
 echo Building Docker image...
 docker build -t pneumonia-detector .
-
-echo Creating uploads directory if not exists...
-if not exist uploads mkdir uploads
 
 echo Starting container...
 docker run -d --name pneumonia-detector ^
@@ -15,7 +19,9 @@ docker run -d --name pneumonia-detector ^
     -e TF_ENABLE_ONEDNN_OPTS=0 ^
     -v "%cd%/uploads:/app/uploads" ^
     -v "%cd%/pneumonia.db:/app/pneumonia.db" ^
+    -v "%cd%/models:/app/models" ^
     pneumonia-detector
 
 echo.
-echo Application is running at http://localhost:5000 
+echo Application is running at http://localhost:5000
+echo To check logs, run: docker logs pneumonia-detector 

@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y \
 # Создаем и переходим в рабочую директорию
 WORKDIR /app
 
+# Создаем необходимые директории
+RUN mkdir -p uploads models
+
 # Копируем файлы зависимостей
 COPY requirements.txt .
 
@@ -23,9 +26,6 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Копируем файлы приложения
 COPY . .
-
-# Создаем директорию для загрузок
-RUN mkdir -p uploads
 
 # Открываем порт
 EXPOSE 5000
