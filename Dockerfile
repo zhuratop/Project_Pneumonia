@@ -1,5 +1,5 @@
-# Используем Ubuntu 24.04 как базовый образ
-FROM ubuntu:24.04
+# Используем Ubuntu 22.04 как базовый образ
+FROM ubuntu:22.04
 
 # Устанавливаем переменные окружения
 ENV PYTHONUNBUFFERED=1 \
@@ -8,7 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Устанавливаем необходимые пакеты
 RUN apt-get update && apt-get install -y \
-    python3.12 \
+    python3.10 \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
