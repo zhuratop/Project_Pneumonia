@@ -43,7 +43,7 @@ def init_db():
 try:
     if not os.path.exists(model_path):
         logger.error(f"Модель не найдена по пути: {model_path}")
-        logger.error("Пожалуйста, запустите download_model.py для загрузки модели")
+        logger.error("Пожалуйста, убедитесь, что файл модели находится в папке models/")
         sys.exit(1)
     model = load_model(model_path)
     logger.info("Модель успешно загружена")

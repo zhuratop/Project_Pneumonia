@@ -8,7 +8,11 @@ if not exist uploads mkdir uploads
 if not exist models mkdir models
 
 echo Checking if model exists...
-python download_model.py
+if not exist models\final_pneumonia_model.h5 (
+    echo ERROR: Model not found in models/final_pneumonia_model.h5
+    echo Please place the model file in the models directory
+    exit /b 1
+)
 
 echo Building Docker image...
 docker build -t pneumonia-detector .
@@ -24,4 +28,8 @@ docker run -d --name pneumonia-detector ^
 
 echo.
 echo Application is running at http://localhost:5000
-echo To check logs, run: docker logs pneumonia-detector 
+echo To check logs, run: docker logs pneumonia-detector
+echo.
+echo Press any key to show container logs...
+pause
+docker logs pneumonia-detector 
