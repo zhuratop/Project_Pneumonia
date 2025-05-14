@@ -5,9 +5,11 @@ from werkzeug.utils import secure_filename
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import load_img, img_to_array
+from tensorflow.keras.layers import InputLayer
 import numpy as np
 import logging
 import sys
+import json
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +29,20 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Создаем папку для модели, если её нет
 os.makedirs('models', exist_ok=True)
 
+# Кастомный класс для загрузки старой модели
+class CustomInputLayer(InputLayer):
+    @classmethod
+    def from_config(cls, config):
+        # Преобразуем batch_shape в input_shape и batch_size
+        if 'batch_shape' in config:
+            batch_shape = config.pop('batch_shape')
+            if batch_shape[0] is None:  # Если batch_size не определен
+                config['input_shape'] = batch_shape[1:]
+            else:
+                config['input_shape'] = batch_shape[1:]
+                config['batch_size'] = batch_shape[0]
+        return super(CustomInputLayer, cls).from_config(config)
+
 # Инициализация базы данных
 def init_db():
     conn = sqlite3.connect('pneumonia.db')
@@ -45,7 +61,10 @@ try:
         logger.error(f"Модель не найдена по пути: {model_path}")
         logger.error("Пожалуйста, убедитесь, что файл модели находится в папке models/")
         sys.exit(1)
-    model = load_model(model_path)
+    
+    # Регистрируем кастомный класс для загрузки
+    custom_objects = {'InputLayer': CustomInputLayer}
+    model = load_model(model_path, custom_objects=custom_objects)
     logger.info("Модель успешно загружена")
 except Exception as e:
     logger.error(f"Ошибка при загрузке модели: {str(e)}")
