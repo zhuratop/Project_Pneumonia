@@ -10,6 +10,7 @@ import numpy as np
 import logging
 import sys
 import json
+from datetime import datetime
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -47,13 +48,40 @@ class CustomInputLayer(InputLayer):
 def init_db():
     conn = sqlite3.connect('pneumonia.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS predictions
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  filename TEXT NOT NULL,
-                  prediction REAL NOT NULL,
-                  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            result TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     conn.commit()
     conn.close()
+
+def save_result(filename, result, confidence):
+    conn = sqlite3.connect('pneumonia.db')
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO results (filename, result, confidence)
+        VALUES (?, ?, ?)
+    ''', (filename, result, confidence))
+    conn.commit()
+    conn.close()
+
+def get_last_results(limit=3):
+    conn = sqlite3.connect('pneumonia.db')
+    c = conn.cursor()
+    c.execute('''
+        SELECT id, filename, result, confidence, timestamp
+        FROM results
+        ORDER BY timestamp DESC
+        LIMIT ?
+    ''', (limit,))
+    results = c.fetchall()
+    conn.close()
+    return results
 
 # Загрузка модели
 try:
@@ -85,63 +113,66 @@ def preprocess_image(img_path):
         raise
 
 @app.route('/')
-def home():
-    return render_template('index.html')
+def index():
+    last_results = get_last_results()
+    return render_template('index.html', last_results=last_results)
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        logger.warning("Файл не найден в запросе")
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        logger.warning("Пустое имя файла")
-        return jsonify({'error': 'No selected file'}), 400
-    
-    if file and allowed_file(file.filename):
-        try:
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        if 'file' not in request.files:
+            logger.error("Файл не найден в запросе")
+            return jsonify({'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            logger.error("Пустое имя файла")
+            return jsonify({'error': 'No file selected'}), 400
+        
+        if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            logger.info(f"Файл сохранен: {filepath}")
             
-            # Обработка изображения и получение предсказания
-            processed_image = preprocess_image(filepath)
-            prediction = model.predict(processed_image)[0][0]
-            logger.info(f"Получено предсказание: {prediction}")
+            try:
+                file.save(filepath)
+                logger.info(f"Файл сохранен: {filepath}")
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении файла: {str(e)}")
+                return jsonify({'error': 'Error saving file'}), 500
             
-            # Сохранение результата в базу данных
-            conn = sqlite3.connect('pneumonia.db')
-            c = conn.cursor()
-            c.execute('INSERT INTO predictions (filename, prediction) VALUES (?, ?)',
-                     (filename, float(prediction)))
-            conn.commit()
-            conn.close()
-            logger.info("Результат сохранен в базу данных")
+            try:
+                # Получаем предсказание
+                prediction = model.predict(preprocess_image(filepath))
+                result = "Пневмония" if prediction[0][0] > 0.5 else "Норма"
+                confidence = float(prediction[0][0])
+                logger.info(f"Получено предсказание: {result} (уверенность: {confidence})")
+            except Exception as e:
+                logger.error(f"Ошибка при обработке изображения: {str(e)}")
+                return jsonify({'error': 'Error processing image'}), 500
             
-            # Удаление файла после обработки
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                logger.info("Файл удален после обработки")
+            try:
+                # Сохраняем результат
+                save_result(filename, result, confidence)
+                logger.info("Результат сохранен в базу данных")
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении результата в БД: {str(e)}")
+                return jsonify({'error': 'Error saving result'}), 500
             
-            result_message = 'Пневмония обнаружена' if prediction > 0.5 else 'Пневмония не обнаружена'
-            probability = float(prediction) * 100
+            # Получаем последние результаты для отображения
+            last_results = get_last_results()
             
-            return jsonify({
-                'success': True,
-                'prediction': float(prediction)
-            })
+            return render_template('result.html', 
+                                 prediction=result,
+                                 confidence=confidence,
+                                 filename=filename,
+                                 last_results=last_results)
+        else:
+            logger.error(f"Недопустимый тип файла: {file.filename}")
+            return jsonify({'error': 'Invalid file type'}), 400
             
-        except Exception as e:
-            logger.error(f"Ошибка при обработке файла: {str(e)}")
-            if os.path.exists(filepath):
-                os.remove(filepath)
-                logger.info("Файл удален после ошибки")
-            return jsonify({'error': str(e)}), 500
-    
-    logger.warning("Неверный тип файла")
-    return jsonify({'error': 'Invalid file type'}), 400
+    except Exception as e:
+        logger.error(f"Неожиданная ошибка: {str(e)}")
+        return jsonify({'error': 'Unexpected error occurred'}), 500
 
 if __name__ == '__main__':
     init_db()
