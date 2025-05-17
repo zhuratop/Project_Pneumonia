@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Результат анализа</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result-container {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .result-container.positive {
+            background-color: #fff5f5;
+            border: 1px solid #feb2b2;
+        }
+        .result-container.negative {
+            background-color: #f0fff4;
+            border: 1px solid #9ae6b4;
+        }
+        .history {
+            margin-top: 30px;
+        }
+        .history-item {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .history-item.positive {
+            background-color: #fff5f5;
+            border: 1px solid #feb2b2;
+        }
+        .history-item.negative {
+            background-color: #f0fff4;
+            border: 1px solid #9ae6b4;
+        }
+        .history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #0066cc;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            background-color: #f8fafc;
+            transition: all 0.3s ease;
+        }
+        .back-link:hover {
+            background-color: #edf2f7;
+            text-decoration: none;
+        }
+        .result-text {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .result-text.positive {
+            color: #c53030;
+        }
+        .result-text.negative {
+            color: #276749;
+        }
+    </style>
+</head>
+<body>
+    <h1>Результат анализа</h1>
+    
+    <div class="result-container {% if prediction == 'Пневмония' %}positive{% else %}negative{% endif %}">
+        <h2>Анализ файла: {{ filename }}</h2>
+        <p class="result-text {% if prediction == 'Пневмония' %}positive{% else %}negative{% endif %}">
+            <strong>Результат:</strong> {{ prediction }}
+        </p>
+        <p><strong>Уверенность в наличии пневмонии:</strong> {{ "%.2f"|format(confidence * 100) }}%</p>
+    </div>
+
+    <div class="history">
+        <h2>Последние исследования</h2>
+        {% if last_results %}
+            {% for result in last_results %}
+            <div class="history-item {% if result[2] == 'Пневмония' %}positive{% else %}negative{% endif %}">
+                <p><strong>№{{ result[0] }}</strong> - {{ result[1] }}</p>
+                <p class="result-text {% if result[2] == 'Пневмония' %}positive{% else %}negative{% endif %}">
+                    Результат: {{ result[2] }}
+                </p>
+                <p>Уверенность в наличии пневмонии: {{ "%.2f"|format(result[3] * 100) }}%</p>
+                <p>Дата: {{ result[4] }}</p>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>История исследований пуста</p>
+        {% endif %}
+    </div>
+
+    <a href="/" class="back-link">← Вернуться к загрузке</a>
+</body>
+</html> 
